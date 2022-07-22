@@ -36,7 +36,7 @@ pub struct EntryWords(pub u64, pub String);
 #[derive(Clone, Debug, PartialEq)]
 pub struct EntryElements(pub Option<u64>, pub String);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DictEntry {
     words : Vec<EntryWords>,
     readings : Vec<EntryElements>,
@@ -55,11 +55,11 @@ impl DictEntry {
 
         for entry in &words {
             if word_identifier_list.contains(&entry.0) {
-                return Err(LdError::EntryError);
+                return Err(LdError::RepeatingWordId);
             }
 
             if entry.1.is_empty() {
-                return Err(LdError::EmptyWordError);
+                return Err(LdError::EmptyWord);
             }
 
             word_identifier_list.insert(entry.0);
@@ -81,40 +81,59 @@ impl DictEntry {
 
 //chapters
 #[derive(Debug)]
-pub struct Chapters {
+pub struct BookLibrary {
     local_id_ctr: u64,
     entry_mapping: BTreeMap<u64, DictEntry>, //local_id, DictEntry
-    chapter_lists: BTreeMap<(u64, u64), Vec<u64>>, //(book_id, chapter_id), Vec of local_id in that chapter
-    _book_titles: BTreeMap<u64, String>, //bookId, book_titles
-    _chapter_titles: BTreeMap<u64, BTreeMap<u64, String>>, //bookId -> chapterId, chapter title
+    entry_list_by_chapter: BTreeMap<(u64, u64), Vec<u64>>, //(book_id, chapter_id), vec<local_id>
+    book_titles: BTreeMap<u64, String>, //bookId, book_titles
+    chapter_titles: BTreeMap<u64, BTreeMap<u64, String>>, //bookId -> chapterId, chapter title
 }
 
-impl Chapters {
-    pub fn new() -> Chapters {
-        Chapters {
+impl BookLibrary {
+    pub fn new() -> BookLibrary {
+        BookLibrary {
             local_id_ctr: 0,
             entry_mapping: BTreeMap::new(),
-            chapter_lists: BTreeMap::new(),
-            _book_titles: BTreeMap::new(),
-            _chapter_titles: BTreeMap::new(),
+            entry_list_by_chapter: BTreeMap::new(),
+            book_titles: BTreeMap::new(),
+            chapter_titles: BTreeMap::new(),
         }
     }
 
     pub fn add_entry(&mut self, entry: DictEntry, book_id: u64, chapter_id: u64) {
         self.entry_mapping.insert(self.local_id_ctr, entry);
 
-        self.chapter_lists.entry((book_id, chapter_id))
+        self.entry_list_by_chapter.entry((book_id, chapter_id))
             .or_insert(Vec::new())
             .push(self.local_id_ctr);
 
-        //TODO: add titles handling
         self.local_id_ctr += 1;
+    }
+
+    pub fn add_book_title(&mut self, book_id: u64, book_title: String) {
+        self.book_titles.entry(book_id)
+            .or_insert(book_title);
+
+        //init chapters
+        self.chapter_titles.entry(book_id)
+            .or_insert(BTreeMap::new());
+    }
+
+    pub fn add_chapter_title(&mut self, book_id: u64, chapter_id: u64, chapter_title: String)
+            -> Result<(), LdError> {
+        if let Some(map) = self.chapter_titles.get_mut(&book_id) {
+            map.entry(chapter_id).or_insert(chapter_title);
+
+            Ok(())
+        } else {
+            Err(LdError::BookDoesNotExist)
+        }
     }
 
     //stdout only
     pub fn db_view_book(&self, target_book_id: u64, target_chapter_id: Option<u64>) {
         let mut display_list = Vec::new();
-        for ((book_id, chapter_id), id_list) in &self.chapter_lists {
+        for ((book_id, chapter_id), id_list) in &self.entry_list_by_chapter {
             match target_chapter_id {
                 Some(t_ch_id) => {
                     if *book_id == target_book_id &&
@@ -131,8 +150,28 @@ impl Chapters {
             }
         }
 
-        for loc_id in display_list {
-            println!("{:?}", &self.entry_mapping[&loc_id]);
+        let b_title = self.book_titles.get(&target_book_id);
+        match (b_title, target_chapter_id) {
+            (None, _) => {
+                println!("Book title is missing.");
+            },
+            (Some(b_title), None) => {
+                println!("Book title: {:?}", b_title);
+            },
+            (Some(b_title), Some(c_id)) => {
+                println!("Book title: {:?}", b_title);
+                if let Some(chapter_map) = self.chapter_titles.get(&target_book_id) {
+                    if let Some(c_title) = chapter_map.get(&c_id) {
+                        println!("Chapter title: {}", c_title);
+                    } else {
+                        println!("Chapter title missing.");
+                    }
+                }
+            },
+        }
+
+        for id in display_list {
+            println!("{:?}", &self.entry_mapping[&id]);
         }
     }
 }
@@ -172,7 +211,7 @@ mod tests {
             vec!(EntryElements(Some(1),"Desc1".to_string())),
             vec!(EntryElements(Some(2),"Note1".to_string())));
 
-        assert_eq!(output, Err(LdError::EntryError));
+        assert_eq!(output, Err(LdError::RepeatingWordId));
     }
 
     #[test]
@@ -184,13 +223,20 @@ mod tests {
             vec!(EntryElements(Some(1),"Desc1".to_string())),
             vec!(EntryElements(Some(2),"Note1".to_string())));
 
-        assert_eq!(output, Err(LdError::EmptyWordError));
+        assert_eq!(output, Err(LdError::EmptyWord));
     }
 
     #[test]
-    fn chapters_new() {
-        let test = Chapters::new();
+    fn chapters_new_correct_init() {
+        let test = BookLibrary::new();
         assert_eq!(test.local_id_ctr, 0);
+    }
+
+    #[test]
+    fn chapters_add_book_title_create_() {
+        //TODO: book title and chapter title tests
+        let _test = BookLibrary::new();
+        assert_eq!(1, 0);
     }
 
     #[test]
@@ -230,7 +276,7 @@ mod tests {
             vec!(EntryElements(None,"E Desc1".to_string())),
             vec!(EntryElements(None,"E Note1".to_string())));
 
-        let mut test = Chapters::new();
+        let mut test = BookLibrary::new();
 
         test.add_entry(entry_A.unwrap(), 1, 1);
         test.add_entry(entry_B.unwrap(), 1, 2);
@@ -245,7 +291,7 @@ mod tests {
         expected.insert((1,3), vec![3]);
         expected.insert((2,1), vec![2]);
 
-        assert_eq!(test.chapter_lists, expected);
+        assert_eq!(test.entry_list_by_chapter, expected);
     }
 }
 

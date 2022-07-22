@@ -5,7 +5,7 @@
 mod errors;
 mod local_dict;
 
-use local_dict::Chapters;
+use local_dict::BookLibrary;
 use local_dict::DictEntry;
 use local_dict::EntryElements;
 
@@ -50,19 +50,27 @@ fn main() -> Result<(), errors::LdError> {
                     vec!(EntryElements(None,"E Desc1".to_string())),
                     vec!(EntryElements(None,"E Note1".to_string())))?;
 
-    let mut newbook = Chapters::new();
+    let mut newbook = BookLibrary::new();
 
+    let entry_Bx = entry_B.clone();
     newbook.add_entry(entry_A, 1, 1);
     newbook.add_entry(entry_B, 1, 2);
+    newbook.add_entry(entry_Bx, 1, 2);
     newbook.add_entry(entry_C, 1, 3);
     newbook.add_entry(entry_D, 2, 1);
     newbook.add_entry(entry_E, 2, 2);
+
+    newbook.add_book_title(1, "Heaven Burns Red".to_string());
+    newbook.add_book_title(1, "ヘブバン".to_string());
+    newbook.add_chapter_title(1, 2, "Burn My Soul".to_string())?;
 
     println!("Book 1 Chapter 2");
     newbook.db_view_book(1, Some(2));
     println!();
     println!("Book 1 All Chapters");
     newbook.db_view_book(1, None);
-
+    println!();
+    println!("Book 2 No title");
+    newbook.db_view_book(2, None);
     Ok(())
 }
