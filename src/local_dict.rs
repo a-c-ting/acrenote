@@ -1,9 +1,10 @@
 // #![allow(dead_code)]
-// #![allow(unused)]
+#![allow(unused)]
 //temp flag ends here
 
 /*
- * Each string in the 'words' vec contains possible ways to write the word.
+ * Words (might be better to rename to word_pool later)
+ * Each string in the 'words' contains possible ways to write the word.
  * i.e. colour vs color, 着替え vs 着換え
  *
  * Each item in 'words' also accompanies a unique identifying number within the entry.
@@ -119,6 +120,18 @@ impl BookLibrary {
             .or_insert(BTreeMap::new());
     }
 
+    pub fn get_book_title(&self, book_id: u64) -> Option<&String>{
+        self.book_titles
+            .get(&book_id)
+    }
+
+    pub fn get_chapter_title(&self, book_id: u64, chapter_id: u64) -> Option<&String> {
+        if let Some(map) = self.chapter_titles.get(&book_id) {
+            return map.get(&chapter_id);
+        }
+        None
+    }
+
     pub fn add_chapter_title(&mut self, book_id: u64, chapter_id: u64, chapter_title: String)
             -> Result<(), LdError> {
         if let Some(map) = self.chapter_titles.get_mut(&book_id) {
@@ -131,6 +144,7 @@ impl BookLibrary {
     }
 
     //stdout only
+    //for dev purposes
     pub fn db_view_book(&self, target_book_id: u64, target_chapter_id: Option<u64>) {
         let mut display_list = Vec::new();
         for ((book_id, chapter_id), id_list) in &self.entry_list_by_chapter {
@@ -151,23 +165,23 @@ impl BookLibrary {
         }
 
         let b_title = self.book_titles.get(&target_book_id);
-        match (b_title, target_chapter_id) {
-            (None, _) => {
+        let c_map = self.chapter_titles.get(&target_book_id);
+        match (b_title, target_chapter_id, c_map) {
+            (None, _, _) => {
                 println!("Book title is missing.");
             },
-            (Some(b_title), None) => {
-                println!("Book title: {:?}", b_title);
+            (Some(b_title), None, _) => {
+                println!("Book title: {}", b_title);
             },
-            (Some(b_title), Some(c_id)) => {
-                println!("Book title: {:?}", b_title);
-                if let Some(chapter_map) = self.chapter_titles.get(&target_book_id) {
-                    if let Some(c_title) = chapter_map.get(&c_id) {
-                        println!("Chapter title: {}", c_title);
-                    } else {
-                        println!("Chapter title missing.");
-                    }
+            (Some(b_title), Some(c_id), Some(c_map)) => {
+                println!("Book title: {}", b_title);
+                if let Some(c_title) = c_map.get(&c_id) {
+                    println!("Chapter title: {}", c_title);
+                } else {
+                    println!("Chapter title missing.");
                 }
             },
+            (Some(_), Some(_), None) => unreachable!(),
         }
 
         for id in display_list {
@@ -233,10 +247,24 @@ mod tests {
     }
 
     #[test]
-    fn chapters_add_book_title_create_() {
-        //TODO: book title and chapter title tests
-        let _test = BookLibrary::new();
-        assert_eq!(1, 0);
+    fn chapters_add_get_titles() {
+        let mut test = BookLibrary::new();
+        let test_book_id = 1;
+        let test_book_title = String::from("book title 1337");
+        let test_chapter_id = 4;
+        let test_chapter_title = String::from("chapter title leet");
+
+        test.add_book_title(test_book_id,
+            test_book_title.clone());
+        let res = test.add_chapter_title(test_book_id,
+            test_chapter_id,
+            test_chapter_title.clone());
+
+        assert!(res.is_ok());
+        assert_eq!(test_book_title,
+            *test.get_book_title(test_book_id).unwrap());
+        assert_eq!(test_chapter_title,
+            *test.get_chapter_title(test_book_id, test_chapter_id).unwrap());
     }
 
     #[test]

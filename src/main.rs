@@ -12,8 +12,10 @@ use local_dict::EntryElements;
 use crate::local_dict::EntryWords;
 
 fn main() -> Result<(), errors::LdError> {
-    //shameful testing stuff
+    //load from JSON
+    //save from JSON
 
+    //shameful testing stuff
     let entry_A = DictEntry::create_entry(
                     // 0,
                     vec!(EntryWords(1, "A Word1".to_string()),
