@@ -30,40 +30,52 @@
 
 use crate::errors::LdError;
 use std::collections::{BTreeMap, HashSet};
+use serde::{Serialize, Deserialize};
+// use serde_json;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct EntryWords(pub u64, pub String);
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug)]
+pub struct EntryWord {
+    pub loc_id: u64,
+    pub word: String,
+}
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct EntryElements(pub Option<u64>, pub String);
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug)]
+pub struct EntryElement {
+    pub entry_id: Option<u64>,
+    pub elem: String,
+}
 
-#[derive(Debug, PartialEq, Clone)]
+//Dictionary Entries
+#[derive(PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct DictEntry {
-    words : Vec<EntryWords>,
-    readings : Vec<EntryElements>,
-    desc : Vec<EntryElements>,
-    notes : Vec<EntryElements>,
+    words : Vec<EntryWord>,
+    readings : Vec<EntryElement>,
+    desc : Vec<EntryElement>,
+    notes : Vec<EntryElement>,
 }
 
 impl DictEntry {
     pub fn create_entry(
-        words : Vec<EntryWords>, //TODO: change vec to hashmap (or set)
-        readings : Vec<EntryElements>,
-        desc: Vec<EntryElements>,
-        notes: Vec<EntryElements>)
+        words : Vec<EntryWord>, //TODO: change vec to hashmap (or set)
+        readings : Vec<EntryElement>,
+        desc: Vec<EntryElement>,
+        notes: Vec<EntryElement>)
     -> Result<DictEntry, LdError> {
         let mut word_identifier_list: HashSet<u64> = HashSet::new();
 
         for entry in &words {
-            if word_identifier_list.contains(&entry.0) {
+            if word_identifier_list.contains(&entry.loc_id) {
                 return Err(LdError::RepeatingWordId);
             }
 
-            if entry.1.is_empty() {
+            if entry.word.is_empty() {
                 return Err(LdError::EmptyWord);
             }
 
-            word_identifier_list.insert(entry.0);
+            word_identifier_list.insert(entry.loc_id);
         }
 
         Ok(DictEntry {
@@ -73,15 +85,11 @@ impl DictEntry {
             notes,
         })
     }
-
-    // pub fn submit_entry() {
-        //format entry to send to database
-    // }
-
 }
 
 //chapters
 #[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct BookLibrary {
     local_id_ctr: u64,
     entry_mapping: BTreeMap<u64, DictEntry>, //local_id, DictEntry
@@ -197,20 +205,20 @@ mod tests {
     #[test]
     fn dict_entry_create_should_return_entry() {
         let output = DictEntry::create_entry(
-            vec!(EntryWords(0, "Word1".to_string()),
-                EntryWords(1, "Word2".to_string())),
-            vec!(EntryElements(None,"Reading1".to_string())),
-            vec!(EntryElements(Some(1),"Desc1".to_string())),
-            vec!(EntryElements(Some(2),"Note1".to_string())));
+            vec!(EntryWord{ loc_id: 0, word: "Word1".to_string() },
+                EntryWord{ loc_id: 1, word: "Word2".to_string() }),
+            vec!(EntryElement{ entry_id: None, elem: "Reading1".to_string() }),
+            vec!(EntryElement{ entry_id: Some(1), elem: "Desc1".to_string()} ),
+            vec!(EntryElement{ entry_id: Some(2), elem: "Note1".to_string()} ));
 
         assert!(output.is_ok());
 
         let expected = DictEntry {
-            words: vec!(EntryWords(0, "Word1".to_string()),
-                EntryWords(1, "Word2".to_string())),
-            readings: vec!(EntryElements(None,"Reading1".to_string())),
-            desc: vec!(EntryElements(Some(1),"Desc1".to_string())),
-            notes: vec!(EntryElements(Some(2),"Note1".to_string()))
+            words: vec!(EntryWord{ loc_id: 0, word: "Word1".to_string()},
+                EntryWord{ loc_id: 1, word: "Word2".to_string()}),
+            readings: vec!(EntryElement{ entry_id: None, elem: "Reading1".to_string()}),
+            desc: vec!(EntryElement{ entry_id: Some(1), elem: "Desc1".to_string()}),
+            notes: vec!(EntryElement{ entry_id: Some(2), elem: "Note1".to_string()})
         };
 
         assert_eq!(output.unwrap(), expected);
@@ -219,11 +227,11 @@ mod tests {
     #[test]
     fn dict_entry_create_should_return_err_on_repeated_word_id() {
         let output = DictEntry::create_entry(
-            vec!(EntryWords(0, "Word1".to_string()),
-                EntryWords(0, "Word2".to_string())),
-            vec!(EntryElements(None,"Reading1".to_string())),
-            vec!(EntryElements(Some(1),"Desc1".to_string())),
-            vec!(EntryElements(Some(2),"Note1".to_string())));
+            vec!(EntryWord{ loc_id: 0, word: "Word1".to_string()},
+                EntryWord{ loc_id: 0, word: "Word2".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "Reading1".to_string()}),
+            vec!(EntryElement{ entry_id: Some(1), elem: "Desc1".to_string()}),
+            vec!(EntryElement{ entry_id: Some(2), elem: "Note1".to_string()}));
 
         assert_eq!(output, Err(LdError::RepeatingWordId));
     }
@@ -231,11 +239,11 @@ mod tests {
     #[test]
     fn dict_entry_create_should_return_err_on_empty_word() {
         let output = DictEntry::create_entry(
-            vec!(EntryWords(1, "Word1".to_string()),
-               EntryWords(2, "".to_string())),
-            vec!(EntryElements(None,"Reading1".to_string())),
-            vec!(EntryElements(Some(1),"Desc1".to_string())),
-            vec!(EntryElements(Some(2),"Note1".to_string())));
+            vec!(EntryWord{ loc_id: 1, word: "Word1".to_string()},
+               EntryWord{ loc_id: 2, word: "".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "Reading1".to_string()}),
+            vec!(EntryElement{ entry_id: Some(1), elem: "Desc1".to_string()}),
+            vec!(EntryElement{ entry_id: Some(2), elem: "Note1".to_string()}));
 
         assert_eq!(output, Err(LdError::EmptyWord));
     }
@@ -269,48 +277,48 @@ mod tests {
 
     #[test]
     fn chapters_add_entry_should_put_correct_local_id_per_bookchapter() {
-        let entry_A = DictEntry::create_entry(
-            vec!(EntryWords(1, "A Word1".to_string()),
-                EntryWords(2, "A Word2".to_string())),
-            vec!(EntryElements(None,"A Reading1".to_string())),
-            vec!(EntryElements(None,"A Desc1".to_string())),
-            vec!(EntryElements(None,"A Note1".to_string())));
+        let entry_a = DictEntry::create_entry(
+            vec!(EntryWord{ loc_id: 1, word: "A Word1".to_string()},
+                EntryWord{ loc_id: 2, word: "A Word2".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "A Reading1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "A Desc1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "A Note1".to_string()}));
 
-        let entry_B = DictEntry::create_entry(
-            vec!(EntryWords(1, "B Word1".to_string()),
-                EntryWords(2, "B Word2".to_string())),
-            vec!(EntryElements(None,"B Reading1".to_string())),
-            vec!(EntryElements(None,"B Desc1".to_string())),
-            vec!(EntryElements(None,"B Note1".to_string())));
+        let entry_b = DictEntry::create_entry(
+            vec!(EntryWord{ loc_id: 1, word: "B Word1".to_string()},
+                EntryWord{ loc_id: 2, word: "B Word2".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "B Reading1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "B Desc1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "B Note1".to_string()}));
 
-        let entry_C = DictEntry::create_entry(
-            vec!(EntryWords(1, "C Word1".to_string()),
-                EntryWords(2, "C Word2".to_string())),
-            vec!(EntryElements(None,"C Reading1".to_string())),
-            vec!(EntryElements(None,"C Desc1".to_string())),
-            vec!(EntryElements(None,"C Note1".to_string())));
+        let entry_c = DictEntry::create_entry(
+            vec!(EntryWord{ loc_id: 1, word: "C Word1".to_string()},
+                EntryWord{ loc_id: 2, word: "C Word2".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "C Reading1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "C Desc1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "C Note1".to_string()}));
 
-        let entry_D = DictEntry::create_entry(
-            vec!(EntryWords(1, "D Word1".to_string()),
-                EntryWords(2, "D Word2".to_string())),
-            vec!(EntryElements(None,"D Reading1".to_string())),
-            vec!(EntryElements(None,"D Desc1".to_string())),
-            vec!(EntryElements(None,"D Note1".to_string())));
+        let entry_d = DictEntry::create_entry(
+            vec!(EntryWord{ loc_id: 1, word: "D Word1".to_string()},
+                EntryWord{ loc_id: 2, word: "D Word2".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "D Reading1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "D Desc1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "D Note1".to_string()}));
 
-        let entry_E = DictEntry::create_entry(
-            vec!(EntryWords(1, "E Word1".to_string()),
-                EntryWords(2, "E Word2".to_string())),
-            vec!(EntryElements(None,"E Reading1".to_string())),
-            vec!(EntryElements(None,"E Desc1".to_string())),
-            vec!(EntryElements(None,"E Note1".to_string())));
+        let entry_e = DictEntry::create_entry(
+            vec!(EntryWord{ loc_id: 1, word: "E Word1".to_string()},
+                EntryWord{ loc_id: 2, word: "E Word2".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "E Reading1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "E Desc1".to_string()}),
+            vec!(EntryElement{ entry_id: None, elem: "E Note1".to_string()}));
 
         let mut test = BookLibrary::new();
 
-        test.add_entry(entry_A.unwrap(), 1, 1);
-        test.add_entry(entry_B.unwrap(), 1, 2);
-        test.add_entry(entry_D.unwrap(), 2, 1);
-        test.add_entry(entry_C.unwrap(), 1, 3);
-        test.add_entry(entry_E.unwrap(), 1, 1);
+        test.add_entry(entry_a.unwrap(), 1, 1);
+        test.add_entry(entry_b.unwrap(), 1, 2);
+        test.add_entry(entry_d.unwrap(), 2, 1);
+        test.add_entry(entry_c.unwrap(), 1, 3);
+        test.add_entry(entry_e.unwrap(), 1, 1);
 
         let mut expected: BTreeMap<(u64, u64), Vec<u64>> = BTreeMap::new();
 
